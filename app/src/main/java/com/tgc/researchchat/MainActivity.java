@@ -41,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
         connectButton.setOnClickListener(view -> {
             if (Patterns.IP_ADDRESS.matcher(ip.getText()).matches()) {
                 String info = getInfo();
-                Intent intent = new Intent(MainActivity.this, chatClient.class);
+                Intent intent = new Intent(MainActivity.this, ChatClient.class);
                 intent.putExtra("ip&port", info);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);

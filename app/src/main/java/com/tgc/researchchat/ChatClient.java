@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
@@ -24,6 +25,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageSwitcher;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -45,6 +47,11 @@ import com.google.zxing.BarcodeFormat;
 import com.hbisoft.pickit.PickiT;
 import com.hbisoft.pickit.PickiTCallbacks;
 import com.journeyapps.barcodescanner.BarcodeEncoder;
+import com.tgc.researchchat.adapters.MusicAdapter;
+import com.tgc.researchchat.models.MySongs;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -60,32 +67,114 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 
+import static android.Manifest.permission.ACCESS_FINE_LOCATION;
+import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
+import static android.content.ContentValues.TAG;
 
-public class chatClient extends AppCompatActivity implements PickiTCallbacks {
+public class ChatClient extends AppCompatActivity implements PickiTCallbacks {
     String TAG = "CLIENT ACTIVITY";
 
     EditText smessage;
     ImageButton sent;
     String serverIpAddress = "";
-    int myport;
+    public static int myport=8973;
+    public static int myport_2=8922;
+    public static int myport_3=6281;
     int sendPort;
     ArrayList<Message> messageArray;
     ImageButton fileUp;
     TextView textView;
-    chatServer s;
-    fileServer f;
+    ChatServer s;
+    FileServer f;
     String ownIp;
     Toolbar toolbar;
     ProgressBar progressBar;
     PickiT pickiT;
     private Boolean exit = false;
     private RecyclerView mMessageRecycler;
+    private RecyclerView mSongRecycler;
     private ChatAdapterRecycler mMessageAdapter;
+    public MusicAdapter musicAdapter;
     private int REQUEST_CODE = 200;
     View showMe;
+    View getMedia;
     ImageView myQrCode;
     ImageView close;
+    public ArrayList<MySongs> allSongs = new ArrayList<>();
+    private ImageView currentlyPlaying;
+    private MediaPlayer mediaPlayer = new MediaPlayer();
+    public MyFilesInteface myFilesInteface = new MyFilesInteface() {
+        @Override
+        public void gotFiles(File file) {
+            Log.e(TAG, "gotFiles: "+file.getName() );
+            if (file.getName().contains(".mp3")) {
+                String filename = file.getName();
+                filename = filename.trim();
+                String path = Environment.getExternalStorageDirectory() + "/Download/";
+                System.out.println(TAG + "path and filename => " + path + filename);
+                Uri uri = Uri.parse(path + filename);
+                if (mediaPlayer!=null&&mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                    if (currentlyPlaying!=null){
+                        currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+
+                    }
+                } else {
+                    mediaPlayer = new MediaPlayer();
+                    mediaPlayer = MediaPlayer.create(ChatClient.this, uri);
+//                    try {
+////                        mediaPlayer.prepareAsync();
+////                        mediaPlayer.setDataSource(path+File.separator +filename);
+////                        mediaPlayer.setDataSource(file.de);
+////                        mediaPlayer.prepare();
+//                    } catch (IOException e) {
+//                        Log.e(TAG, "gotFiles: IOException", e);
+//                        e.printStackTrace();
+//                    }
+                    //Log.d(TAG, "onClick: " + context.getObbDir() + "/downloadFolder/" + path);
+                    if (mediaPlayer!=null){
+                        mediaPlayer.start();
+
+                    }
+                    if (currentlyPlaying!=null){
+                        currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_pause_24));
+                    }
+                }
+            }else {
+                Log.e(TAG, "gotFiles: not an mp3" );
+            }
+            if (mediaPlayer != null) {
+                mediaPlayer.setOnCompletionListener(mediaPlayer -> {
+                    if (currentlyPlaying!=null){
+                        currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+                    }
+
+                });
+            }else {
+                Log.e(TAG, "gotFiles: cant set oncomplete listener" );
+            }
+        }
+    };
+
+    interface MyFilesInteface {
+        void gotFiles(File file);
+    }
+    public MyFileListInteface myFileListInteface=new MyFileListInteface() {
+        @Override
+        public void getSongs(ArrayList<MySongs> songs) {
+            Log.e(TAG, "getSongs: "+songs.size() );
+            allSongs.clear();
+            allSongs.addAll(songs);
+            musicAdapter = new MusicAdapter(allSongs, ChatClient.this);
+            mSongRecycler.setLayoutManager(new LinearLayoutManager(ChatClient.this));
+            mSongRecycler.setAdapter(musicAdapter);
+
+        }
+    };
+    interface MyFileListInteface {
+        void getSongs(ArrayList<MySongs> songs);
+    }
 
 
     @SuppressLint("CutPasteId")
@@ -95,6 +184,7 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
         setContentView(R.layout.activity_chatbox);
 
         showMe = findViewById(R.id.showMe);
+        getMedia = findViewById(R.id.getMedia);
         myQrCode = findViewById(R.id.myQrCode);
 
         generateMyQR();
@@ -111,13 +201,17 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
 
         messageArray = new ArrayList<>();
         mMessageRecycler = findViewById(R.id.message_list);
+        mSongRecycler = findViewById(R.id.audioList);
         mMessageAdapter = new ChatAdapterRecycler(this, messageArray);
+        musicAdapter = new MusicAdapter(allSongs, this);
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         layoutManager.setStackFromEnd(true);
         layoutManager.setSmoothScrollbarEnabled(true);
 
         mMessageRecycler.setLayoutManager(layoutManager);
+        mSongRecycler.setLayoutManager(new LinearLayoutManager(this));
+        mSongRecycler.setAdapter(musicAdapter);
 
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
@@ -134,26 +228,31 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
         getSupportActionBar().setTitle("Connection to " + serverIpAddress);
 
         if (!serverIpAddress.equals("")) {
-            s = new chatServer(ownIp, this, getApplicationContext(), mMessageAdapter, mMessageRecycler, messageArray, myport, serverIpAddress);
+            s = new ChatServer(ownIp, this, getApplicationContext(), mMessageAdapter, mMessageRecycler, messageArray, myport, serverIpAddress, mSongRecycler, musicAdapter,allSongs,myFileListInteface);
             s.start();
-            f = new fileServer(getApplicationContext(), mMessageAdapter, mMessageRecycler, messageArray, myport, serverIpAddress);
+            f = new FileServer(ChatClient.this, mMessageAdapter, mMessageRecycler, messageArray, myport, serverIpAddress, mSongRecycler, musicAdapter, myFilesInteface);
             f.start();
         }
 
         if (permissionAlreadyGranted()) {
-            Toast.makeText(chatClient.this, "Permission is already granted!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(ChatClient.this, "Permission is already granted!", Toast.LENGTH_SHORT).show();
 
         }
 
         requestPermission();
         sent.setOnClickListener(v -> {
             if (!smessage.getText().toString().isEmpty()) {
-                User user = new User("1:" + smessage.getText().toString());
-                user.execute();
+                SendDataToRemote sendDataToRemote = new SendDataToRemote("1:" + smessage.getText().toString());
+                sendDataToRemote.execute();
             } else {
                 Toast toast = Toast.makeText(getApplicationContext(), "Please write something", Toast.LENGTH_SHORT);
                 toast.show();
             }
+        });
+        getMedia.setOnClickListener(v -> {
+            getMedia.setEnabled(false);
+            SendDataToRemote sendDataToRemote = new SendDataToRemote("3:get media");
+            sendDataToRemote.execute();
         });
 
         fileUp.setOnClickListener(v -> {
@@ -172,6 +271,14 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
 
     }
 
+    public void sendMessage(String message) {
+        Log.e(TAG, "sendMessage: "+message );
+        if (message != null && !message.contentEquals("")) {
+            SendDataToRemote sendDataToRemote = new SendDataToRemote( message);
+            sendDataToRemote.execute();
+        }
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
@@ -182,7 +289,7 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_settings) {
-            final Context context = chatClient.this;
+            final Context context = ChatClient.this;
             ColorPickerDialogBuilder
                     .with(context)
                     .setTitle("Choose color")
@@ -193,8 +300,8 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
                     })
                     .setPositiveButton("ok", (dialog, selectedColor, allColors) -> {
                         changeBackgroundColor(selectedColor);
-                        User user = new User("2:" + Integer.toHexString(selectedColor));
-                        user.execute();
+                        SendDataToRemote sendDataToRemote = new SendDataToRemote("2:" + Integer.toHexString(selectedColor));
+                        sendDataToRemote.execute();
                         Log.d("ColorPicker", "onColorChanged: 0x" + Integer.toHexString(selectedColor));
                     })
                     .setNegativeButton("cancel", (dialog, which) -> {
@@ -222,14 +329,14 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
                 try {
                     FileOutputStream fos = new FileOutputStream(file, true);
                     fos.write(s.getBytes());
-                    Toast.makeText(chatClient.this, "Chat history has been saved in " + path +"/Download/  folder", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(ChatClient.this, "Chat history has been saved in " + path + "/Download/  folder", Toast.LENGTH_SHORT).show();
 
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }
-        if (item.getItemId()==R.id.action_QR){
+        if (item.getItemId() == R.id.action_QR) {
             generateMyQR();
             showMe.setVisibility(View.VISIBLE);
         }
@@ -237,7 +344,7 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
     }
 
     private void generateMyQR() {
-        String myiP = "" ;
+        String myiP = "";
         WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         myiP = Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
 
@@ -249,17 +356,20 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
             e.printStackTrace();
         }
     }
+
     private boolean permissionAlreadyGranted() {
         int result = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        int result2 = ContextCompat.checkSelfPermission(this, READ_EXTERNAL_STORAGE);
+        int result3 = ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION);
 
-        if (result == PackageManager.PERMISSION_GRANTED)
+        if (result == PackageManager.PERMISSION_GRANTED&&result2 == PackageManager.PERMISSION_GRANTED&&result3 == PackageManager.PERMISSION_GRANTED)
             return true;
 
         return false;
     }
 
     private void requestPermission() {
-        ActivityCompat.requestPermissions(this, new String[]{WRITE_EXTERNAL_STORAGE}, REQUEST_CODE);
+        ActivityCompat.requestPermissions(this, new String[]{WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,ACCESS_FINE_LOCATION}, REQUEST_CODE);
 
     }
 
@@ -286,7 +396,7 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
 
     private void openSettingsDialog() {
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(chatClient.this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(ChatClient.this);
         builder.setTitle("Required Permissions");
         builder.setMessage("This app require permission to use awesome feature. Grant them in app settings.");
         builder.setPositiveButton("Take Me To SETTINGS", (dialog, which) -> {
@@ -348,12 +458,63 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
 
     }
 
+    public void playMusic(MySongs mySong, ImageView imageView) {
+
+        Log.e(TAG, "playMusic: playing" + mySong.getDisplayName());
+        JSONObject a = new JSONObject();
+        try {
+            a.put("startStreaming", mySong.getJSONObject());
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        sendMessage(a.toString());
+        if (currentlyPlaying != null) {
+            currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+        }
+        //TODO Pause the player
+        if (mediaPlayer!=null){
+            if (mediaPlayer.isPlaying()){
+                mediaPlayer.pause();
+                if (currentlyPlaying != null) {
+                    currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+                }
+            }else{
+                mediaPlayer.start();
+                if (currentlyPlaying != null) {
+                    currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_pause_24));
+                }
+            }
+        }else{
+
+        }
+        if (currentlyPlaying != null) {
+            if (currentlyPlaying==imageView){
+                if (currentlyPlaying.getDrawable()==ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24)){
+                    currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_pause_24));
+                }else{
+                    currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+                }
+            }else{
+                currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_play_arrow_24));
+                currentlyPlaying = imageView;
+                currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_pause_24));
+            }
+        }else  {
+            currentlyPlaying = imageView;
+            currentlyPlaying.setImageDrawable(ChatClient.this.getResources().getDrawable(R.drawable.ic_baseline_pause_24));
+        }
+    }
+
+    public void startStreaming(MySongs mySongs) {
+        new fileTransfer(mySongs.getPath()).execute();
+    }
+
     @SuppressLint("StaticFieldLeak")
 
-    public class User extends AsyncTask<Void, Void, String> {
+    public class SendDataToRemote extends AsyncTask<Void, Void, String> {
         String msg;
 
-        User(String message) {
+        SendDataToRemote(String message) {
             msg = message;
         }
 
@@ -362,7 +523,7 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
             try {
                 String ipadd = serverIpAddress;
                 int portr = sendPort;
-                Socket clientSocket = new Socket(ipadd, portr);
+                Socket clientSocket = new Socket(ipadd, myport);
                 OutputStream outToServer = clientSocket.getOutputStream();
                 PrintWriter output = new PrintWriter(outToServer);
                 output.println(msg);
@@ -378,6 +539,7 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
 
         protected void onPostExecute(String result) {
             runOnUiThread(() -> sent.setEnabled(true));
+
             Log.i(TAG, "on post execution result => " + result);
             StringBuilder stringBuilder = new StringBuilder(result);
             if (stringBuilder.charAt(0) == '1' && stringBuilder.charAt(1) == ':') {
@@ -388,6 +550,8 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
                 messageArray.add(new Message(result, 0, Calendar.getInstance().getTime()));
                 mMessageRecycler.setAdapter(mMessageAdapter);
                 smessage.setText("");
+            } else if (stringBuilder.charAt(0) == '3' && stringBuilder.charAt(1) == ':') {
+                getMedia.setEnabled(true);
             }
         }
 
@@ -451,6 +615,8 @@ public class chatClient extends AppCompatActivity implements PickiTCallbacks {
 
                 clientSocket.close();
             } catch (IOException e) {
+                Log.e(TAG, "doInBackground: "+e );
+                Toast.makeText(ChatClient.this, "Connection was reset", Toast.LENGTH_SHORT).show();
                 e.printStackTrace();
             }
             return filenameX;

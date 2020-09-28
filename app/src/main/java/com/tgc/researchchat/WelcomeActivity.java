@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.text.format.Formatter;
 import android.util.Log;
 import android.util.Patterns;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.google.zxing.BarcodeFormat;
@@ -24,6 +23,7 @@ public class WelcomeActivity extends AppCompatActivity {
     private static final String PORT_1 = "8981";
     private ActivityWelcomeBinding b;
     private static final String TAG = "WelcomeActivity";
+    String myiP = "", port = PORT_1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,7 +39,6 @@ public class WelcomeActivity extends AppCompatActivity {
     }
 
     private void generateMyQR() {
-        String myiP = "", port = PORT_1;
         WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         myiP = Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
 
@@ -51,34 +50,48 @@ public class WelcomeActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
+
     // Get the results:
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-        if(result != null) {
-            if(result.getContents() == null) {
+        if (result != null) {
+            if (result.getContents() == null) {
                 Toast.makeText(this, "Cancelled", Toast.LENGTH_LONG).show();
             } else {
                 Toast.makeText(this, "Scanned: " + result.getContents(), Toast.LENGTH_LONG).show();
                 if (Patterns.IP_ADDRESS.matcher(result.getContents()).matches()) {
                     String info = getInfo(result.getContents());
-                    Intent intent = new Intent(WelcomeActivity.this, chatClient.class);
+                    Intent intent = new Intent(WelcomeActivity.this, ChatClient.class);
                     intent.putExtra("ip&port", info);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                     startActivity(intent);
                 } else {
-                    Toast toast = Toast.makeText(this, "Please Enter a Valid IP Address", Toast.LENGTH_SHORT);
-                    toast.show();
+                    if (result.getContents().trim().contentEquals("0.0.0.0")) {
+                        String gateway=myiP.replace(myiP.split("\\.")[3],"1");
+                        Log.e(TAG, "onActivityResult: gateway"+gateway );
+                        String info = getInfo(gateway);
+                        Intent intent = new Intent(WelcomeActivity.this, ChatClient.class);
+                        intent.putExtra("ip&port", info);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                        startActivity(intent);
+                    } else {
+                        Toast toast = Toast.makeText(this, "Please Enter a Valid IP Address", Toast.LENGTH_SHORT);
+                        toast.show();
+                    }
                 }
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
+
     String getInfo(String ip) {
-        String info = ip+ " " + PORT_1 + " " + PORT_1;
+        String info = ip + " " + PORT_1 + " " + PORT_1;
         Log.i(TAG, "info => " + info);
         return info;
     }

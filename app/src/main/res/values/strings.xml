@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Peer to Peer Chat</string>
+    <string name="app_name">Play Audio Over Wifi</string>
     <string name="dummy_ip">0.0.0.0</string>
     <string name="your_ip">Your IP</string>
     <string name="status">Status</string>

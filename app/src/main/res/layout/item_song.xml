@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/white"
+    android:layout_margin="4dp">
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/music_image"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_margin="2dp"
+        android:padding="10dp"
+        android:tint="@color/black"
+        android:src="@drawable/ic_baseline_music_note_24"/>
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/music_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_marginLeft="10dp"
+        android:layout_toStartOf="@+id/play_pause"
+        android:layout_toLeftOf="@+id/play_pause"
+        android:layout_toEndOf="@+id/music_image"
+        android:layout_toRightOf="@+id/music_image"
+        android:textColor="@color/black"
+        android:maxLines="1"
+        android:text="Song Name"
+        android:textSize="12dp" />
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/play_pause"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_centerVertical="true"
+        android:layout_margin="2dp"
+        android:layout_alignParentEnd="true"
+        android:tint="@color/black"
+        android:paddingEnd="10dp"
+        android:src="@drawable/ic_baseline_play_arrow_24"
+        android:layout_alignParentRight="true"
+        android:paddingRight="10dp" />
+</RelativeLayout>
