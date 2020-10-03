@@ -8,7 +8,10 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
@@ -53,15 +56,21 @@ import com.tgc.researchchat.models.MySongs;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -71,6 +80,7 @@ import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 import static android.content.ContentValues.TAG;
+import static com.tgc.researchchat.FileServer.channelConfig;
 
 public class ChatClient extends AppCompatActivity implements PickiTCallbacks {
     String TAG = "CLIENT ACTIVITY";
@@ -591,33 +601,127 @@ public class ChatClient extends AppCompatActivity implements PickiTCallbacks {
 
                 long fileSize = file.length();
                 byte[] byteArray = new byte[(int) fileSize];
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buff = new byte[4096];
+                int i = Integer.MAX_VALUE;
+                while ((i = fileInputStream.read(buff, 0, buff.length)) > 0) {
+                    baos.write(buff, 0, i);
+                }
 
-                DataInputStream dataInputStream = new DataInputStream(fileInputStream);
-                dataInputStream.readFully(byteArray, 0, byteArray.length);
+                /////////////////////////////////////////
+
+               /* try {
+                    InputStream inStream = new InputStream() {
+                        @Override
+                        public int read() throws IOException {
+                            return 0;
+                        }
+                    };
+                    AudioRecord recorder;
+
+                    int sampleRate = 44100 ; // 44100 for music
+                    int channelConfig = AudioFormat.CHANNEL_IN_MONO;
+                    int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
+                    int minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat);
+                    boolean status = true;
+
+                    DatagramSocket socket = new DatagramSocket();
+                    Log.d("VS", "Socket Created");
+
+                    byte[] buffer = new byte[minBufSize];
+
+                    Log.d("VS","Buffer created of size " + minBufSize);
+                    DatagramPacket packet;
+
+                    final InetAddress destination = InetAddress.getByName(ipadd);
+                    Log.d("VS", "Address retrieved");
+
+
+                    recorder = new AudioRecord(MediaRecorder.AudioSource.,sampleRate,channelConfig,audioFormat,minBufSize*10);
+                    Log.d("VS", "Recorder initialized");
+
+                    recorder.startRecording();
+
+
+                    while(status == true) {
+
+
+                        //reading data from MIC into buffer
+                        minBufSize = recorder.read(buffer, 0, buffer.length);
+
+                        //putting buffer in the packet
+                        packet = new DatagramPacket(buffer,buffer.length,destination,portr);
+
+                        socket.send(packet);
+                        System.out.println("MinBufferSize: " +minBufSize);
+
+
+                    }
+
+
+
+                } catch(UnknownHostException e) {
+                    Log.e("VS", "UnknownHostException");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    Log.e("VS", "IOException");
+                }*/
+                ///////////////////////////////////////
+
+//                DataInputStream dataInputStream = new DataInputStream(fileInputStream);
+//                dataInputStream.readFully(buff, 0, buff.length);
 
                 OutputStream outputStream = clientSocket.getOutputStream();
 
-                DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+                DataOutputStream dataOutputStream = new DataOutputStream(baos);
                 dataOutputStream.writeUTF(file.getName());
-                dataOutputStream.writeLong(byteArray.length);
+                dataOutputStream.writeLong(buff.length);
 
                 filenameX = file.getName();
 
 
-                dataOutputStream.write(byteArray, 0, byteArray.length);
+                dataOutputStream.write(buff, 0, buff.length);
                 dataOutputStream.flush();
 
-                outputStream.write(byteArray, 0, byteArray.length);
+                outputStream.write(buff, 0, buff.length);
                 outputStream.flush();
 
                 outputStream.close();
                 dataOutputStream.close();
 
                 clientSocket.close();
+//                DataInputStream dataInputStream = new DataInputStream(fileInputStream);
+//                dataInputStream.readFully(byteArray, 0, byteArray.length);
+//
+//                OutputStream outputStream = clientSocket.getOutputStream();
+//
+//                DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+//                dataOutputStream.writeUTF(file.getName());
+//                dataOutputStream.writeLong(byteArray.length);
+//
+//                filenameX = file.getName();
+//
+//
+//                dataOutputStream.write(byteArray, 0, byteArray.length);
+//                dataOutputStream.flush();
+//
+//                outputStream.write(byteArray, 0, byteArray.length);
+//                outputStream.flush();
+//
+//                outputStream.close();
+//                dataOutputStream.close();
+//
+//                clientSocket.close();
             } catch (IOException e) {
                 Log.e(TAG, "doInBackground: "+e );
-                Toast.makeText(ChatClient.this, "Connection was reset", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        Toast.makeText(ChatClient.this, "Connection was reset", Toast.LENGTH_SHORT).show();
+
+                    }
+                }); e.printStackTrace();
             }
             return filenameX;
         }

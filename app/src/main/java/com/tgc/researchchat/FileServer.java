@@ -3,6 +3,7 @@ package com.tgc.researchchat;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.os.AsyncTask;
 import android.os.Environment;
@@ -12,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.tgc.researchchat.adapters.MusicAdapter;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -38,12 +40,22 @@ public class FileServer extends Thread {
     private ChatAdapterRecycler mAdapter;
     ChatClient.MyFilesInteface myFilesInteface;
     private int port;
-    static final int sampleFreq = 44100;
+    private static final int RECORDER_SAMPLERATE = 44100;
+    private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_MONO;
+    private static final int RECORDER_AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
+    private AudioRecord recorder = null;
+    private Thread recordingThread = null;
+    private boolean isRecording = false;
+
+    int bufferSize = AudioRecord.getMinBufferSize(RECORDER_SAMPLERATE,
+            RECORDER_CHANNELS, RECORDER_AUDIO_ENCODING);
+
+    static final int sampleFreq = 8000;
     static final int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
-    static final int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
+    static final int audioEncoding = AudioFormat.ENCODING_PCM_8BIT;
     static final int streamType = STREAM_MUSIC;
     static final int audioMode = MODE_STREAM;
-    static final int bufferSize = getMinBufferSize(sampleFreq, channelConfig, audioMode);
+//    static final int bufferSize = getMinBufferSize(sampleFreq, channelConfig, audioMode);
 
     FileServer(Context context, ChatAdapterRecycler mAdapter, RecyclerView messageList, ArrayList<Message> messageArray, int port, String serverIpAddress, RecyclerView mSongRecycler, MusicAdapter musicAdapter, ChatClient.MyFilesInteface myFilesInteface) {
         this.messageArray = messageArray;
@@ -103,18 +115,31 @@ public class FileServer extends Thread {
                     String fileName = dataInputStream.readUTF();
                     outputFile = new File(testDirectory+"/Download/", fileName);
                     text = fileName;
+                    //TODO start of stream
                     byte [] audioBuffer = new byte[4096];
+                    //creates input stream readers to read incoming data
+                    BufferedInputStream myBis = new BufferedInputStream(sockets[0].getInputStream());
+                    DataInputStream myDis = new DataInputStream(myBis);
+                    int BufferElements2Rec = 1024; // want to play 2048 (2K) since 2 bytes we use only 1024
+                    int BytesPerElement = 2; // 2 bytes in 16bit format
+                    Log.e(TAG, "Input created, listener");
+                    AudioTrack myAudioTrack = new AudioTrack(streamType, RECORDER_SAMPLERATE, channelConfig, RECORDER_AUDIO_ENCODING, BufferElements2Rec*BytesPerElement, audioMode);
 //                    AudioTrack myAudioTrack = new AudioTrack(streamType, sampleFreq, channelConfig, audioEncoding, bufferSize, audioMode);
+                    //Log.d(debugStr, String.valueOf(mySocket.getInputStream().read(audioBuffer)));
+
+                    Log.e(TAG, "track made");
+                    // Read the file into the music array.
                     int i = 0;
                     //TODO unsure of while loop condition
-//                    while (mySocket.getInputStream().read(audioBuffer) != -1) {
-//
-//                        audioBuffer[audioBuffer.length-1-i] = myDis.readByte();
-//                        myAudioTrack.play();
-//                        myAudioTrack.write(audioBuffer, 0, audioBuffer.length);
-//                        i++;
-//                    }
-                    OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outputFile));
+                    while (sockets[0].getInputStream().read(audioBuffer) != -1) {
+                        Log.e(TAG, "doInBackground: looping");
+                        audioBuffer[audioBuffer.length-1-i] = myDis.readByte();
+                        myAudioTrack.play();
+                        myAudioTrack.write(audioBuffer, 0, audioBuffer.length);
+                        i++;
+                    }
+
+                    /*OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outputFile));
                     long fileSize = dataInputStream.readLong();
                     int bytesRead;
                     byte[] byteArray = new byte[8192 * 16];
@@ -122,11 +147,11 @@ public class FileServer extends Thread {
                     while (fileSize > 0 && (bytesRead = dataInputStream.read(byteArray, 0, (int) Math.min(byteArray.length, fileSize))) != -1) {
                         outputStream.write(byteArray, 0, bytesRead);
                         fileSize -= bytesRead;
-                    }
+                    }*/
                     inputStream.close();
                     dataInputStream.close();
-                    outputStream.flush();
-                    outputStream.close();
+//                    outputStream.flush();
+//                    outputStream.close();
 
                 } catch (Exception e) {
                     Log.e(TAG, "doInBackground: "+e.getMessage() );
@@ -145,7 +170,7 @@ public class FileServer extends Thread {
                 messageArray.add(new Message("New File Received: " + result, 1, Calendar.getInstance().getTime()));
                 messageList.setAdapter(mAdapter);
                 if (outputFile!=null){
-                    myFilesInteface.gotFiles(outputFile);
+//                    myFilesInteface.gotFiles(outputFile);
                 }
             }
         }
